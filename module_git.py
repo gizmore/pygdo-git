@@ -14,7 +14,12 @@ class module_git(GDO_Module):
         ]
 
     def gdo_subscribe_events(self):
-        Application.EVENTS.add_timer(Time.ONE_MINUTE, self.git_timer, Application.EVENTS.FOREVER)
+        Application.EVENTS.add_timer(Time.ONE_SECOND * 10, self.git_timer, Application.EVENTS.FOREVER)
 
-    def git_timer(self):
+    async def git_timer(self):
+        cut = Time.get_date(Application.TIME - Time.ONE_MINUTE * 2)
+        if repo := GDO_GitRepo.table().select().where(f"repo_checked < '{cut}'").first().exec().fetch_object():
+            await self.check_repo(repo)
+
+    async def check_repo(self, repo: GDO_GitRepo):
         pass
