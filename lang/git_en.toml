@@ -1,1 +1,21 @@
 module_git = "Git"
+
+############
+# Announce #
+############
+msg_git_update = "%s Update(s) for %s - %s by %s."
+
+#######
+# Add #
+#######
+mt_git_git_add = "Clone"
+md_git_git_add = "Clone a repository to watch it."
+msg_cloned_repo = "Repo %s successfully cloned from %s into %s."
+
+########
+# Repo #
+########
+mt_git_git_repo = "Repository"
+md_git_git_repo = "Show the status of a git repository."
+msg_git_repo = "%s commits in %s. Last commit: %S"
+
