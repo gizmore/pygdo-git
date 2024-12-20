@@ -19,8 +19,8 @@ class module_git(GDO_Module):
             GDT_Duration('git_check_sleep').not_null().min(30).max(Time.ONE_WEEK).initial('6s17ms'),
         ]
 
-    def cfg_sleep(self) -> float:
-        return self.get_config_value('git_check_sleep')
+    async def cfg_sleep(self) -> float:
+        return await self.get_config_value('git_check_sleep')
 
     ##########
     # Module #
@@ -35,11 +35,11 @@ class module_git(GDO_Module):
     # Events #
     ##########
 
-    def gdo_subscribe_events(self):
-        Application.EVENTS.add_timer(self.cfg_sleep(), self.git_timer)
+    async def gdo_subscribe_events(self):
+        await Application.EVENTS.add_timer(await self.cfg_sleep(), self.git_timer)
 
     async def git_timer(self):
-        sleep = self.cfg_sleep()
+        sleep = await self.cfg_sleep()
         try:
             cut = Time.get_date(Application.TIME - sleep)
             if repo := GDO_GitRepo.table().select().where(f"repo_ready IS NOT NULL AND repo_checked < '{cut}'").order('repo_checked').first().exec().fetch_object():
