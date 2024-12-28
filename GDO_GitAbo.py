@@ -35,14 +35,14 @@ class GDO_GitAbo(GDO):
     def get_channel(self) -> GDO_Channel:
         return self.gdo_value('gra_channel')
 
-    async def get_user_abo(self, repo: GDO_GitRepo, user: GDO_User) -> 'GDO_GitAbo':
-        return await self.table().get_by_vals({'gra_user': user.get_id(), 'gra_repo': repo.get_id()})
+    def get_user_abo(self, repo: GDO_GitRepo, user: GDO_User) -> 'GDO_GitAbo':
+        return self.table().get_by_vals({'gra_user': user.get_id(), 'gra_repo': repo.get_id()})
 
-    async def get_channel_abo(self, repo: GDO_GitRepo, channel: GDO_Channel) -> 'GDO_GitAbo':
-        return await self.table().get_by_vals({'gra_channel': channel.get_id(), 'gra_repo': repo.get_id()})
+    def get_channel_abo(self, repo: GDO_GitRepo, channel: GDO_Channel) -> 'GDO_GitAbo':
+        return self.table().get_by_vals({'gra_channel': channel.get_id(), 'gra_repo': repo.get_id()})
 
-    async def get_repo_abo(self, repo: GDO_GitRepo, user: GDO_User, channel: GDO_Channel):
-        return await self.get_channel_abo(repo, channel) if channel else await self.get_user_abo(repo, user)
+    def get_repo_abo(self, repo: GDO_GitRepo, user: GDO_User, channel: GDO_Channel):
+        return self.get_channel_abo(repo, channel) if channel else self.get_user_abo(repo, user)
 
     def has_subscribed(self, repo: GDO_GitRepo, user: GDO_User, channel: GDO_Channel) -> bool:
         return True if self.get_repo_abo(repo, user, channel) else False

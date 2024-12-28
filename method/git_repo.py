@@ -21,6 +21,6 @@ class git_repo(Method):
     def get_repo(self) -> GDO_GitRepo:
         return self.param_value('repo')
 
-    async def gdo_execute(self) -> GDT:
+    def gdo_execute(self) -> GDT:
         repo = self.get_repo()
         return self.reply('msg_git_repo', [repo.get_commit_count(), repo.render_name(), repo.get_commit_url()])

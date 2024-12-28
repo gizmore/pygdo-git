@@ -21,7 +21,7 @@ class git_gdo(Method):
     def get_module(self) -> GDO_Module:
         return self.param_value('module')
 
-    async def gdo_execute(self) -> GDT:
+    def gdo_execute(self) -> GDT:
         if module := self.get_module():
             return self.git_module_repos(module)
         else:

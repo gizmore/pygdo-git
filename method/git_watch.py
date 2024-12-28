@@ -18,7 +18,7 @@ class git_watch(Method):
     def get_repo(self) -> GDO_GitRepo:
         return self.param_value('repo')
 
-    async def gdo_execute(self) -> GDT:
+    def gdo_execute(self) -> GDT:
         if repo := self.get_repo():
             GDO_GitAbo.blank({
                 'gra_repo': repo.get_id(),
