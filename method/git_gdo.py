@@ -29,10 +29,10 @@ class git_gdo(Method):
 
     def git_module_repos(self, module: GDO_Module) -> GDT:
         info = Installer.get_repo_info(module)
-        return self.reply('msg_git_module', [module.render_name(), f" {t('or') }".join(info[0])])
+        return self.reply('msg_git_module', (module.render_name(), f" {t('or') }".join(info[0])))
 
     def git_modules_overview(self) -> GDT:
         out = []
         for module in ModuleLoader.instance()._cache.values():
             out.append(module.render_name())
-        return self.reply('msg_git_modules', [Arrays.human_join(out)])
+        return self.reply('msg_git_modules', (Arrays.human_join(out),))

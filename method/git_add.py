@@ -36,7 +36,7 @@ class git_add(Method):
             Files.create_dir(path)
             await asgiref.sync.SyncToAsync(git.Repo.clone_from)(url, path)
             repo.save_val('repo_ready', Time.get_date())
-            return self.reply('msg_cloned_repo', [repo.render_name(), html(url), path])
+            return self.reply('msg_cloned_repo', (repo.render_name(), html(url), path))
         except Exception as ex:
             Logger.exception(ex)
             Files.delete_dir(path)

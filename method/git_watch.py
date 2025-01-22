@@ -25,6 +25,6 @@ class git_watch(Method):
                 'gra_user': self._env_user.get_id() if not self._env_channel else None,
                 'gra_channel': self._env_channel.get_id() if self._env_channel else None,
             }).insert()
-            return self.reply('msg_git_subscribed', [repo.render_name()])
+            return self.reply('msg_git_subscribed', (repo.render_name(),))
         else:
             return self.reply('msg_git_watches')
