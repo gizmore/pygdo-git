@@ -7,7 +7,8 @@ from gdo.git.GDO_GitRepo import GDO_GitRepo
 
 class git_watch(Method):
 
-    def gdo_trigger(self) -> str:
+    @classmethod
+    def gdo_trigger(cls) -> str:
         return 'git.watch'
 
     def gdo_parameters(self) -> list[GDT]:

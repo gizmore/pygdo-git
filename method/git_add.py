@@ -14,7 +14,8 @@ from gdo.net.GDT_Url import GDT_Url
 
 class git_add(Method):
 
-    def gdo_trigger(self) -> str:
+    @classmethod
+    def gdo_trigger(cls) -> str:
         return 'git.add'
 
     def gdo_parameters(self) -> list[GDT]:

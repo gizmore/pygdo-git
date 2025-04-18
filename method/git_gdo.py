@@ -10,7 +10,8 @@ from gdo.install.Installer import Installer
 
 class git_gdo(Method):
 
-    def gdo_trigger(self) -> str:
+    @classmethod
+    def gdo_trigger(cls) -> str:
         return 'git.gdo'
 
     def gdo_parameters(self) -> list[GDT]:

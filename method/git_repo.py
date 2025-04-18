@@ -10,7 +10,8 @@ from gdo.table.MethodQueryTable import MethodQueryTable
 
 class git_repo(Method):
 
-    def gdo_trigger(self) -> str:
+    @classmethod
+    def gdo_trigger(cls) -> str:
         return 'git.repo'
 
     def gdo_parameters(self) -> list[GDT]:

@@ -8,7 +8,8 @@ from gdo.table.MethodQueryTable import MethodQueryTable
 
 class git_repos(MethodQueryTable):
 
-    def gdo_trigger(self) -> str:
+    @classmethod
+    def gdo_trigger(cls) -> str:
         return 'git.repos'
 
     def gdo_parameters(self) -> list[GDT]:
