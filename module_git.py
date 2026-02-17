@@ -1,7 +1,7 @@
 from gdo.base.Application import Application
 from gdo.base.GDO_Module import GDO_Module
 from gdo.base.GDT import GDT
-from gdo.base.Logger import Logger
+from gdo.base.GDO import GDO
 from gdo.date.GDT_Duration import GDT_Duration
 from gdo.date.Time import Time
 from gdo.git.GDO_GitAbo import GDO_GitAbo
@@ -25,7 +25,7 @@ class module_git(GDO_Module):
     ##########
     # Module #
     ##########
-    def gdo_classes(self):
+    def gdo_classes(self) -> list[type[GDO]]:
         return [
             GDO_GitRepo,
             GDO_GitAbo,
