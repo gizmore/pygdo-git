@@ -53,7 +53,8 @@ class GDO_GitAbo(GDO):
 
     async def announce(self, repo: GDO_GitRepo, update: GDT_RepoUpdate):
         commit = update._commit
-        args = [update._added, repo.get_commit_url(), commit.message.strip(), commit.author.name,
+        author = commit.author_name if hasattr(commit, 'author_name') else commit.author.name
+        args = [update._added, repo.get_commit_url(), commit.message.strip(), author,
                 update._files, update._insertions, update._deletions]
         for abo in self.get_repo_abos(repo):
             if chan := abo.get_channel():

@@ -17,7 +17,7 @@ class module_git(GDO_Module):
 
     def gdo_module_config(self) -> list[GDT]:
         return [
-            GDT_Duration('git_check_sleep').not_null().min(30).max(Time.ONE_WEEK).initial('6s17ms'),
+            GDT_Duration('git_check_sleep').not_null().min(30).max(Time.ONE_WEEK).initial('1m'),
         ]
 
     def cfg_sleep(self) -> float:

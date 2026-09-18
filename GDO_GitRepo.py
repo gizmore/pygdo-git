@@ -1,5 +1,7 @@
 import os
 import json
+import asyncio
+from dataclasses import dataclass
 from urllib.error import URLError, HTTPError
 from urllib.request import Request, urlopen
 
@@ -23,6 +25,22 @@ from gdo.date.Time import Time
 from gdo.git.GDT_RepoUpdate import GDT_RepoUpdate
 from gdo.git.GDT_GitProvider import GDT_GitProvider
 from gdo.core.GDT_String import GDT_String
+
+
+@dataclass(frozen=True)
+class GitCommitInfo:
+    message: str
+    author_name: str
+
+
+@dataclass(frozen=True)
+class GitRepoScan:
+    commit: GitCommitInfo | None
+    commit_hash: str
+    count: int
+    files: int
+    insertions: int
+    deletions: int
 
 
 class GDO_GitRepo(GDO):
@@ -181,45 +199,44 @@ class GDO_GitRepo(GDO):
     # Check #
     #########
     async def check_repo(self) -> GDT_RepoUpdate:
-        if repo := self.get_repo():
-            Logger.debug(f"Checking repo {self.render_name()}")
-            changed = False
-            o = repo.remotes.origin
-            o.pull()
-            new_count = 0
-            old_count = self.gdo_value('repo_commits')
-            last_hash = self.gdo_val('repo_commit')
-            last_commit = None
-            new_hash = last_hash
-            repo_changed = self.gdo_val('repo_changed')
-            changed_files = set()
-            insertions = 0
-            deletions = 0
-            for commit in repo.iter_commits():
-                if str(commit.hexsha) == last_hash:
-                    break
-                new_count += 1
-                stats = commit.stats
-                changed_files.update(stats.files.keys())
-                insertions += stats.total.get('insertions', 0)
-                deletions += stats.total.get('deletions', 0)
-                if not changed:
-                    last_commit = commit
-                    changed = True
-                    new_hash = str(commit.hexsha)
-                    repo_changed = Time.get_date()
-            self.save_vals({
-                'repo_changed': repo_changed,
-                'repo_commit': new_hash,
-                'repo_commits': old_count + new_count,
-                'repo_checked': Time.get_date(),
-            })
-            if not changed:
-                return None
-            return GDT_RepoUpdate().commit(last_commit).added(new_count).stats(
-                len(changed_files), insertions, deletions)
-        else:
+        if not self.get_repo():
             self.save_vals({
                 'repo_checked': Time.get_date(),
             })
             raise Exception(f"Invalid Repo! {self.render_name()}")
+
+        Logger.debug(f"Checking repo {self.render_name()}")
+        old_hash = self.gdo_val('repo_commit')
+        scan = await asyncio.to_thread(self._pull_and_scan, self.get_path(), old_hash)
+        self.save_vals({
+            'repo_changed': Time.get_date() if scan.commit else self.gdo_val('repo_changed'),
+            'repo_commit': scan.commit_hash,
+            'repo_commits': self.gdo_value('repo_commits') + scan.count,
+            'repo_checked': Time.get_date(),
+        })
+        if not scan.commit:
+            return None
+        return GDT_RepoUpdate().commit(scan.commit).added(scan.count).stats(
+            scan.files, scan.insertions, scan.deletions)
+
+    @staticmethod
+    def _pull_and_scan(path: str, last_hash: str) -> 'GitRepoScan':
+        """Perform blocking GitPython work outside the connector event loop."""
+        repo = git.Repo(path)
+        repo.remotes.origin.pull()
+        count = insertions = deletions = 0
+        changed_files = set()
+        latest = None
+        commit_hash = last_hash
+        for commit in repo.iter_commits():
+            if str(commit.hexsha) == last_hash:
+                break
+            count += 1
+            stats = commit.stats
+            changed_files.update(stats.files.keys())
+            insertions += stats.total.get('insertions', 0)
+            deletions += stats.total.get('deletions', 0)
+            if latest is None:
+                latest = GitCommitInfo(commit.message, commit.author.name)
+                commit_hash = str(commit.hexsha)
+        return GitRepoScan(latest, commit_hash, count, len(changed_files), insertions, deletions)
