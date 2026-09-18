@@ -18,6 +18,7 @@ from gdo.date.GDT_Created import GDT_Created
 from gdo.date.GDT_Timestamp import GDT_Timestamp
 from gdo.date.Time import Time
 from gdo.git.GDT_RepoUpdate import GDT_RepoUpdate
+from gdo.git.GDT_GitProvider import GDT_GitProvider
 from gdo.core.GDT_String import GDT_String
 
 
@@ -30,6 +31,7 @@ class GDO_GitRepo(GDO):
             # A Git remote is not necessarily a web URL: git@host:owner/repo.git
             # and ssh:// URLs are normal, supported repository locations.
             GDT_String('repo_url').not_null().maxlen(1024),
+            GDT_GitProvider('repo_provider'),
             GDT_Char('repo_commit').maxlen(40),
             GDT_UInt('repo_commits').not_null().initial('0'),
             GDT_Timestamp('repo_ready'),
@@ -60,23 +62,62 @@ class GDO_GitRepo(GDO):
     def get_url(self) -> str:
         return self.gdo_val('repo_url')
 
+    def get_provider(self) -> str:
+        return self.gdo_val('repo_provider') or GDT_GitProvider.GENERIC
+
+    @staticmethod
+    def detect_provider(url: str) -> str:
+        host = url.lower()
+        if 'github.com' in host:
+            return GDT_GitProvider.GITHUB
+        if 'gitlab' in host:
+            return GDT_GitProvider.GITLAB
+        if 'gitea' in host or 'forgejo' in host or 'codeberg.org' in host:
+            return GDT_GitProvider.GITEA
+        if 'bitbucket.org' in host:
+            return GDT_GitProvider.BITBUCKET
+        return GDT_GitProvider.GENERIC
+
     def get_commit_count(self) -> int:
         return self.gdo_value('repo_commits')
 
     def get_commit_hash(self) -> str:
         return self.gdo_val('repo_commit')
 
-    def get_commit_url(self):
+    def get_web_url(self) -> str:
         url = self.get_url().removesuffix('.git')
         if url.startswith(('https://', 'http://')):
-            return f"{url}/commit/{self.get_commit_hash()}"
+            return url
         # Common SSH Git syntax maps cleanly to a browser URL for GitHub,
         # Gitea, GitLab and most self-hosted forges. Bare Git remotes simply
         # have no browseable commit URL, which is fine.
         import re
         match = re.match(r'^(?:ssh://)?(?:[^@/]+@)?([^/:]+)[:/]([^\s]+)$', url)
         if match:
-            return f"https://{match.group(1)}/{match.group(2)}/commit/{self.get_commit_hash()}"
+            return f"https://{match.group(1)}/{match.group(2)}"
+        return ''
+
+    def get_commit_url(self, commit: str | None = None) -> str:
+        commit = commit or self.get_commit_hash()
+        if not (base := self.get_web_url()):
+            return ''
+        if self.get_provider() == GDT_GitProvider.GITLAB:
+            return f'{base}/-/commit/{commit}'
+        if self.get_provider() == GDT_GitProvider.BITBUCKET:
+            return f'{base}/commits/{commit}'
+        return f'{base}/commit/{commit}'
+
+    def get_compare_url(self, old: str, new: str) -> str:
+        """Return a forge diff link, or an empty string for plain Git remotes."""
+        if not (base := self.get_web_url()):
+            return ''
+        provider = self.get_provider()
+        if provider == GDT_GitProvider.GITLAB:
+            return f'{base}/-/compare?from={old}&to={new}'
+        if provider == GDT_GitProvider.BITBUCKET:
+            return f'{base}/branches/compare/{old}..{new}'
+        if provider in (GDT_GitProvider.GITHUB, GDT_GitProvider.GITEA):
+            return f'{base}/compare/{old}...{new}'
         return ''
 
     def has_subscribed(self, user: GDO_User, channel: GDO_Channel) -> bool:

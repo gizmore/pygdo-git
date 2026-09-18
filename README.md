@@ -16,3 +16,8 @@ its current head, and does not announce historic commits. The module timer
 pulls watched repositories and announces newly received commits to every
 subscription. A browser link is derived for common HTTP and SSH forge URLs;
 bare Git repositories keep working but naturally have no web commit page.
+
+The optional provider parameter is `generic`, `github`, `gitlab`, `gitea`, or
+`bitbucket`. `generic` auto-detects GitHub, GitLab, Gitea/Forgejo/Codeberg and
+Bitbucket for familiar hostnames. The provider only controls browser
+commit/compare links; cloning remains ordinary Git.

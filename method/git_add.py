@@ -11,6 +11,7 @@ from gdo.base.Util import Files, html
 from gdo.core.GDT_Name import GDT_Name
 from gdo.date.Time import Time
 from gdo.git.GDO_GitRepo import GDO_GitRepo
+from gdo.git.GDT_GitProvider import GDT_GitProvider
 from gdo.core.GDT_String import GDT_String
 
 
@@ -24,11 +25,13 @@ class git_add(Method):
         return [
             GDT_Name('name').not_null().positional(),
             GDT_String('url').not_null().maxlen(1024).positional(),
+            GDT_GitProvider('provider').positional(),
         ]
 
     async def gdo_execute(self) -> GDT:
         url = self.param_val('url')
         name = self.param_val('name')
+        provider = self.param_val('provider')
         if not self.is_git_url(url):
             raise ValueError('Unsupported Git URL. Use https://, ssh://, git:// or git@host:path.')
         if GDO_GitRepo.table().get_by_vals({'repo_name': name}):
@@ -39,6 +42,7 @@ class git_add(Method):
         repo = GDO_GitRepo.blank({
             'repo_name': name,
             'repo_url': url,
+            'repo_provider': GDO_GitRepo.detect_provider(url) if provider == GDT_GitProvider.GENERIC else provider,
             'repo_checked': Time.get_date(),
         }).insert()
         try:

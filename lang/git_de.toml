@@ -1,4 +1,5 @@
 module_git = "Git"
+git_provider_generic = "Allgemeines Git-Remote"
 msg_git_update = "%s Update(s) für %s – %s von %s."
 msg_git_subscribed = "Du erhältst nun Updates für %s."
 msg_git_unsubscribed = "Du erhältst keine Updates mehr für %s."
