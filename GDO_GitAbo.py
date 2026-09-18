@@ -52,10 +52,14 @@ class GDO_GitAbo(GDO):
 
     async def announce(self, repo: GDO_GitRepo, update: GDT_RepoUpdate):
         commit = update._commit
+        args = [update._added, repo.get_commit_url(), commit.message.strip(), commit.author.name,
+                update._files, update._insertions, update._deletions]
         for abo in self.get_repo_abos(repo):
             if chan := abo.get_channel():
-                await chan.send(tiso(chan.get_lang_iso(), 'msg_git_update', (update._added, repo.get_commit_url(), Render.bold(commit.message.strip(), chan.get_server().get_connector().get_render_mode()), commit.author.name)))
+                args[2] = Render.bold(commit.message.strip(), chan.get_server().get_connector().get_render_mode())
+                await chan.send(tiso(chan.get_lang_iso(), 'msg_git_update', args))
             elif user := abo.get_user():
-                await user.send('msg_git_update', (update._added, repo.get_commit_url(), Render.bold(commit.message.strip(), user.get_server().get_connector().get_render_mode()), commit.author.name))
+                args[2] = Render.bold(commit.message.strip(), user.get_server().get_connector().get_render_mode())
+                await user.send('msg_git_update', args)
             else:
                 raise Exception("git abbo announce in not possible state.")

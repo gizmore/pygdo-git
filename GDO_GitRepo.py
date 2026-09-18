@@ -146,10 +146,17 @@ class GDO_GitRepo(GDO):
             last_commit = None
             new_hash = last_hash
             repo_changed = self.gdo_val('repo_changed')
+            changed_files = set()
+            insertions = 0
+            deletions = 0
             for commit in repo.iter_commits():
                 if str(commit.hexsha) == last_hash:
                     break
                 new_count += 1
+                stats = commit.stats
+                changed_files.update(stats.files.keys())
+                insertions += stats.total.get('insertions', 0)
+                deletions += stats.total.get('deletions', 0)
                 if not changed:
                     last_commit = commit
                     changed = True
@@ -163,7 +170,8 @@ class GDO_GitRepo(GDO):
             })
             if not changed:
                 return None
-            return GDT_RepoUpdate().commit(last_commit).added(new_count)
+            return GDT_RepoUpdate().commit(last_commit).added(new_count).stats(
+                len(changed_files), insertions, deletions)
         else:
             self.save_vals({
                 'repo_checked': Time.get_date(),
