@@ -13,6 +13,7 @@ from gdo.core.GDT_User import GDT_User
 from gdo.date.GDT_Created import GDT_Created
 from gdo.git.GDO_GitRepo import GDO_GitRepo
 from gdo.git.GDT_RepoUpdate import GDT_RepoUpdate
+from gdo.git.GDO_GitPullRequest import GDO_GitPullRequest
 
 
 class GDO_GitAbo(GDO):
@@ -63,3 +64,12 @@ class GDO_GitAbo(GDO):
                 await user.send('msg_git_update', args)
             else:
                 raise Exception("git abbo announce in not possible state.")
+
+    async def announce_pull_request(self, repo: GDO_GitRepo, pull: GDO_GitPullRequest):
+        for abo in self.get_repo_abos(repo):
+            args = (repo.render_name(), pull.gdo_val('gpr_number'), pull.gdo_val('gpr_url'),
+                    pull.gdo_val('gpr_title'), pull.gdo_val('gpr_author'))
+            if channel := abo.get_channel():
+                await channel.send(tiso(channel.get_lang_iso(), 'msg_git_pr_opened', args))
+            elif user := abo.get_user():
+                await user.send('msg_git_pr_opened', args)

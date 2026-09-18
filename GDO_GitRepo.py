@@ -1,4 +1,7 @@
 import os
+import json
+from urllib.error import URLError, HTTPError
+from urllib.request import Request, urlopen
 
 import git
 from git import Repo, InvalidGitRepositoryError, NoSuchPathError
@@ -37,6 +40,7 @@ class GDO_GitRepo(GDO):
             GDT_Timestamp('repo_ready'),
             GDT_Timestamp('repo_checked'),
             GDT_Timestamp('repo_changed'),
+            GDT_Timestamp('repo_pr_ready'),
             GDT_Created('repo_created'),
             GDT_Creator('repo_creator'),
         ]
@@ -123,6 +127,39 @@ class GDO_GitRepo(GDO):
     def has_subscribed(self, user: GDO_User, channel: GDO_Channel) -> bool:
         from gdo.git.GDO_GitAbo import GDO_GitAbo
         return GDO_GitAbo.table().has_subscribed(self, user, channel)
+
+    def check_pull_requests(self) -> list:
+        """Return newly opened public GitHub pull requests after the baseline scan."""
+        if self.get_provider() != GDT_GitProvider.GITHUB:
+            return []
+        base = self.get_web_url().replace('https://github.com/', '', 1)
+        request = Request(f'https://api.github.com/repos/{base}/pulls?state=open&per_page=100',
+                          headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PyGDO-Git'})
+        try:
+            with urlopen(request, timeout=10) as response:
+                pulls = json.load(response)
+        except (HTTPError, URLError, OSError, json.JSONDecodeError) as error:
+            # A forge API outage must not stop ordinary Git polling.
+            Logger.warning(f"Cannot check pull requests for {self.render_name()}: {error}")
+            return []
+        from gdo.git.GDO_GitPullRequest import GDO_GitPullRequest
+        baseline = not self.gdo_val('repo_pr_ready')
+        created = []
+        for pull in pulls:
+            values = {'gpr_repo': self.get_id(), 'gpr_number': pull['number'],
+                      'gpr_title': pull['title'], 'gpr_url': pull['html_url'],
+                      'gpr_author': pull['user']['login'], 'gpr_state': pull['state'],
+                      'gpr_updated': pull['updated_at'].replace('T', ' ').replace('Z', '')}
+            known = GDO_GitPullRequest.table().get_by_vals({'gpr_repo': self.get_id(), 'gpr_number': pull['number']})
+            if known:
+                known.save_vals(values)
+            else:
+                pull = GDO_GitPullRequest.blank(values).insert()
+                if not baseline:
+                    created.append(pull)
+        if baseline:
+            self.save_val('repo_pr_ready', Time.get_date())
+        return created
 
     ##########
     # Render #

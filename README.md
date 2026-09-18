@@ -21,3 +21,12 @@ The optional provider parameter is `generic`, `github`, `gitlab`, `gitea`, or
 `bitbucket`. `generic` auto-detects GitHub, GitLab, Gitea/Forgejo/Codeberg and
 Bitbucket for familiar hostnames. The provider only controls browser
 commit/compare links; cloning remains ordinary Git.
+
+## Pull requests
+
+GitHub repositories are also checked for newly opened public pull requests.
+The first API scan establishes a quiet baseline, so enabling the watcher never
+replays the repository's existing PR list. Later PRs are announced to the same
+`git.abbo` subscriptions as commits. The GitHub endpoint is public and needs
+no token for normal public-repository polling; if it is unavailable, commit
+watching continues normally.

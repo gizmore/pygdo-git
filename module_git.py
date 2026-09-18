@@ -6,6 +6,7 @@ from gdo.date.GDT_Duration import GDT_Duration
 from gdo.date.Time import Time
 from gdo.git.GDO_GitAbo import GDO_GitAbo
 from gdo.git.GDO_GitRepo import GDO_GitRepo
+from gdo.git.GDO_GitPullRequest import GDO_GitPullRequest
 
 
 class module_git(GDO_Module):
@@ -29,6 +30,7 @@ class module_git(GDO_Module):
         return [
             GDO_GitRepo,
             GDO_GitAbo,
+            GDO_GitPullRequest,
         ]
 
     ##########
@@ -44,7 +46,9 @@ class module_git(GDO_Module):
             cut = Time.get_date(Application.TIME - sleep)
             if repo := GDO_GitRepo.table().select().where(f"repo_ready IS NOT NULL AND repo_checked < '{cut}'").order('repo_checked').first().exec().fetch_object():
                 if update := await repo.check_repo():
-                    return await GDO_GitAbo.table().announce(repo, update)
+                    await GDO_GitAbo.table().announce(repo, update)
+                for pull in repo.check_pull_requests():
+                    await GDO_GitAbo.table().announce_pull_request(repo, pull)
 
         finally:
             Application.EVENTS.add_timer(sleep, self.git_timer)

@@ -5,6 +5,7 @@ git_provider_generic = "Generic Git remote"
 # Announce #
 ############
 msg_git_update = "%s Update(s) for %s - %s by %s. %s file(s), +%s/-%s lines."
+msg_git_pr_opened = "%s: new PR #%s %s - %s by %s."
 msg_git_subscribed = "You now receive updates for %s."
 msg_git_unsubscribed = "You no longer receive updates for %s."
 msg_git_watches = "No repository selected."
