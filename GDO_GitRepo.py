@@ -132,6 +132,13 @@ class GDO_GitRepo(GDO):
         """Return newly opened public GitHub pull requests after the baseline scan."""
         if self.get_provider() != GDT_GitProvider.GITHUB:
             return []
+        # The regular Git poll is intentionally frequent so commits appear
+        # quickly.  GitHub's unauthenticated REST quota is not.  Reuse the
+        # readiness timestamp as the last successful PR scan and keep this
+        # API request to an hourly cadence.
+        if (last_checked := self.gdo_val('repo_pr_ready')) and \
+                Time.get_time(last_checked) > Application.TIME - Time.ONE_HOUR:
+            return []
         base = self.get_web_url().replace('https://github.com/', '', 1)
         request = Request(f'https://api.github.com/repos/{base}/pulls?state=open&per_page=100',
                           headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PyGDO-Git'})
@@ -141,6 +148,9 @@ class GDO_GitRepo(GDO):
         except (HTTPError, URLError, OSError, json.JSONDecodeError) as error:
             # A forge API outage must not stop ordinary Git polling.
             Logger.warning(f"Cannot check pull requests for {self.render_name()}: {error}")
+            # A rate limit is also an outage for this optional watcher. Do
+            # not retry it once per normal Git-poll interval.
+            self.save_val('repo_pr_ready', Time.get_date())
             return []
         from gdo.git.GDO_GitPullRequest import GDO_GitPullRequest
         baseline = not self.gdo_val('repo_pr_ready')
@@ -157,8 +167,7 @@ class GDO_GitRepo(GDO):
                 pull = GDO_GitPullRequest.blank(values).insert()
                 if not baseline:
                     created.append(pull)
-        if baseline:
-            self.save_val('repo_pr_ready', Time.get_date())
+        self.save_val('repo_pr_ready', Time.get_date())
         return created
 
     ##########

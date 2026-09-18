@@ -40,8 +40,19 @@ class git_add(Method):
         if GDO_GitRepo.table().get_by_vals({'repo_name': name}):
             raise ValueError('A repository with that shortname already exists.')
         path = Application.files_path(f"git_repo/{name}/")
+        # A module reinstall can remove the database row while deliberately
+        # preserving files.  Let the owner register that already-existing,
+        # matching checkout again instead of requiring manual file removal.
+        checkout = None
         if os.path.exists(path):
-            raise ValueError('The checkout path already exists.')
+            try:
+                checkout = git.Repo(path)
+                origin = checkout.remotes.origin.url
+                if self.normalize_url(origin) != self.normalize_url(url):
+                    raise ValueError('The existing checkout has a different origin URL.')
+            except (git.InvalidGitRepositoryError, AttributeError) as ex:
+                raise ValueError('The checkout path already exists but is not a Git repository.') from ex
+        reused_checkout = checkout is not None
         repo = GDO_GitRepo.blank({
             'repo_name': name,
             'repo_url': url,
@@ -49,8 +60,9 @@ class git_add(Method):
             'repo_checked': Time.get_date(),
         }).insert()
         try:
-            Files.create_dir(path)
-            checkout = await asgiref.sync.SyncToAsync(git.Repo.clone_from)(url, path)
+            if not reused_checkout:
+                Files.create_dir(path)
+                checkout = await asgiref.sync.SyncToAsync(git.Repo.clone_from)(url, path)
             # Baseline the clone: only commits received after git.add should
             # be announced by the polling timer.
             repo.save_vals({
@@ -61,7 +73,10 @@ class git_add(Method):
             return self.reply('msg_cloned_repo', (repo.render_name(), html(url), path))
         except Exception as ex:
             Logger.exception(ex)
-            Files.delete_dir(path)
+            # Do not delete a valid checkout that was merely being
+            # re-registered after a module/database reinstall.
+            if not reused_checkout:
+                Files.delete_dir(path)
             repo.delete()
             raise ex
 
@@ -72,3 +87,7 @@ class git_add(Method):
             url.startswith(('https://', 'http://', 'ssh://', 'git://')) or
             bool(re.fullmatch(r'[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+:[^\s]+', url))
         ) and not url.startswith('ext::')
+
+    @staticmethod
+    def normalize_url(url: str) -> str:
+        return url.removesuffix('/').removesuffix('.git').lower()
