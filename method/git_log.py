@@ -8,6 +8,9 @@ from gdo.git.GDO_GitRepo import GDO_GitRepo
 class git_log(Method):
     """Show the local Git history; works as a web page and in chat."""
 
+    def gdo_method_hidden(self) -> bool:
+        return True
+
     @classmethod
     def gdo_trigger(cls) -> str:
         return 'git.log'

@@ -8,6 +8,9 @@ from gdo.table.MethodQueryTable import MethodQueryTable
 
 class git_repos(MethodQueryTable):
 
+    def gdo_method_hidden(self) -> bool:
+        return True
+
     @classmethod
     def gdo_trigger(cls) -> str:
         return 'git.repos'

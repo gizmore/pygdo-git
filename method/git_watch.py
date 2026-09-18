@@ -8,6 +8,9 @@ from gdo.git.GDO_GitRepo import GDO_GitRepo
 
 class git_watch(Method):
 
+    def gdo_method_hidden(self) -> bool:
+        return True
+
     @classmethod
     def gdo_trigger(cls) -> str:
         return 'git.abbo'

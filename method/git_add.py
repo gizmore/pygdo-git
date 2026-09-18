@@ -17,6 +17,9 @@ from gdo.core.GDT_String import GDT_String
 
 class git_add(Method):
 
+    def gdo_method_hidden(self) -> bool:
+        return True
+
     @classmethod
     def gdo_trigger(cls) -> str:
         return 'git.add'
