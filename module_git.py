@@ -48,4 +48,3 @@ class module_git(GDO_Module):
 
         finally:
             Application.EVENTS.add_timer(sleep, self.git_timer)
-

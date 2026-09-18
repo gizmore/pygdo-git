@@ -1,5 +1,7 @@
+import os
+
 import git
-from git import Repo, InvalidGitRepositoryError
+from git import Repo, InvalidGitRepositoryError, NoSuchPathError
 
 from gdo.base.Application import Application
 from gdo.base.GDO import GDO
@@ -16,7 +18,7 @@ from gdo.date.GDT_Created import GDT_Created
 from gdo.date.GDT_Timestamp import GDT_Timestamp
 from gdo.date.Time import Time
 from gdo.git.GDT_RepoUpdate import GDT_RepoUpdate
-from gdo.net.GDT_Url import GDT_Url
+from gdo.core.GDT_String import GDT_String
 
 
 class GDO_GitRepo(GDO):
@@ -25,7 +27,9 @@ class GDO_GitRepo(GDO):
         return [
             GDT_AutoInc('repo_id'),
             GDT_Name('repo_name').unique().not_null(),
-            GDT_Url('repo_url').reachable(True).external().schemes(['http', 'https']).not_null(),
+            # A Git remote is not necessarily a web URL: git@host:owner/repo.git
+            # and ssh:// URLs are normal, supported repository locations.
+            GDT_String('repo_url').not_null().maxlen(1024),
             GDT_Char('repo_commit').maxlen(40),
             GDT_UInt('repo_commits').not_null().initial('0'),
             GDT_Timestamp('repo_ready'),
@@ -39,12 +43,18 @@ class GDO_GitRepo(GDO):
         return self.gdo_val('repo_name')
 
     def get_path(self) -> str:
-        return Application.files_path(f"git_repo/{self.get_id()}_{self.get_repo_name()}/")
+        path = Application.files_path(f"git_repo/{self.get_repo_name()}/")
+        if os.path.isdir(path):
+            return path
+        # Keep repositories created by the pre-shortname layout usable during
+        # an upgrade; new checkouts always use the cleaner shortname path.
+        legacy = Application.files_path(f"git_repo/{self.get_id()}_{self.get_repo_name()}/")
+        return legacy if os.path.isdir(legacy) else path
 
     def get_repo(self) -> Repo:
         try:
             return git.Repo(self.get_path())
-        except InvalidGitRepositoryError:
+        except (InvalidGitRepositoryError, NoSuchPathError):
             return None
 
     def get_url(self) -> str:
@@ -57,7 +67,17 @@ class GDO_GitRepo(GDO):
         return self.gdo_val('repo_commit')
 
     def get_commit_url(self):
-        return f"{self.get_url()}/commit/{self.get_commit_hash()}"
+        url = self.get_url().removesuffix('.git')
+        if url.startswith(('https://', 'http://')):
+            return f"{url}/commit/{self.get_commit_hash()}"
+        # Common SSH Git syntax maps cleanly to a browser URL for GitHub,
+        # Gitea, GitLab and most self-hosted forges. Bare Git remotes simply
+        # have no browseable commit URL, which is fine.
+        import re
+        match = re.match(r'^(?:ssh://)?(?:[^@/]+@)?([^/:]+)[:/]([^\s]+)$', url)
+        if match:
+            return f"https://{match.group(1)}/{match.group(2)}/commit/{self.get_commit_hash()}"
+        return ''
 
     def has_subscribed(self, user: GDO_User, channel: GDO_Channel) -> bool:
         from gdo.git.GDO_GitAbo import GDO_GitAbo
