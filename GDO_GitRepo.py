@@ -146,30 +146,31 @@ class GDO_GitRepo(GDO):
         from gdo.git.GDO_GitAbo import GDO_GitAbo
         return GDO_GitAbo.table().has_subscribed(self, user, channel)
 
-    def check_pull_requests(self) -> list:
-        """Return newly opened public GitHub pull requests after the baseline scan."""
+    def _pull_requests_due(self) -> bool:
         if self.get_provider() != GDT_GitProvider.GITHUB:
-            return []
+            return False
         # The regular Git poll is intentionally frequent so commits appear
         # quickly.  GitHub's unauthenticated REST quota is not.  Reuse the
         # readiness timestamp as the last successful PR scan and keep this
         # API request to an hourly cadence.
         if (last_checked := self.gdo_val('repo_pr_ready')) and \
                 Time.get_time(last_checked) > Application.TIME - Time.ONE_HOUR:
-            return []
+            return False
+        return True
+
+    def _fetch_pull_requests(self) -> list:
+        """Perform only the blocking forge request; safe to run in a worker."""
         base = self.get_web_url().replace('https://github.com/', '', 1)
         request = Request(f'https://api.github.com/repos/{base}/pulls?state=open&per_page=100',
                           headers={'Accept': 'application/vnd.github+json', 'User-Agent': 'PyGDO-Git'})
-        try:
-            with urlopen(request, timeout=10) as response:
-                pulls = json.load(response)
-        except (HTTPError, URLError, OSError, json.JSONDecodeError) as error:
-            # A forge API outage must not stop ordinary Git polling.
-            Logger.warning(f"Cannot check pull requests for {self.render_name()}: {error}")
-            # A rate limit is also an outage for this optional watcher. Do
-            # not retry it once per normal Git-poll interval.
-            self.save_val('repo_pr_ready', Time.get_date())
-            return []
+        with urlopen(request, timeout=10) as response:
+            pulls = json.load(response)
+        if not isinstance(pulls, list):
+            raise json.JSONDecodeError('expected pull request list', '', 0)
+        return pulls
+
+    def _store_pull_requests(self, pulls: list) -> list:
+        """Persist PR state on the Dog thread after a worker fetch completed."""
         from gdo.git.GDO_GitPullRequest import GDO_GitPullRequest
         baseline = not self.gdo_val('repo_pr_ready')
         created = []
@@ -187,6 +188,33 @@ class GDO_GitRepo(GDO):
                     created.append(pull)
         self.save_val('repo_pr_ready', Time.get_date())
         return created
+
+    def _pull_request_error(self, error: Exception) -> list:
+        # A forge API outage must not stop ordinary Git polling. A rate limit
+        # is also an outage for this optional watcher; defer retrying it.
+        Logger.warning(f"Cannot check pull requests for {self.render_name()}: {error}")
+        self.save_val('repo_pr_ready', Time.get_date())
+        return []
+
+    def check_pull_requests(self) -> list:
+        """Synchronous compatibility helper used by CLI/tests."""
+        if not self._pull_requests_due():
+            return []
+        try:
+            pulls = self._fetch_pull_requests()
+        except (HTTPError, URLError, OSError, json.JSONDecodeError) as error:
+            return self._pull_request_error(error)
+        return self._store_pull_requests(pulls)
+
+    async def check_pull_requests_async(self) -> list:
+        """Non-blocking PR polling for the Dog event loop."""
+        if not self._pull_requests_due():
+            return []
+        try:
+            pulls = await asyncio.to_thread(self._fetch_pull_requests)
+        except (HTTPError, URLError, OSError, json.JSONDecodeError) as error:
+            return self._pull_request_error(error)
+        return self._store_pull_requests(pulls)
 
     ##########
     # Render #

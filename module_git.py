@@ -47,7 +47,7 @@ class module_git(GDO_Module):
             if repo := GDO_GitRepo.table().select().where(f"repo_ready IS NOT NULL AND repo_checked < '{cut}'").order('repo_checked').first().exec().fetch_object():
                 if update := await repo.check_repo():
                     await GDO_GitAbo.table().announce(repo, update)
-                for pull in repo.check_pull_requests():
+                for pull in await repo.check_pull_requests_async():
                     await GDO_GitAbo.table().announce_pull_request(repo, pull)
 
         finally:

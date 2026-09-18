@@ -59,12 +59,21 @@ class GDO_GitAbo(GDO):
         for abo in self.get_repo_abos(repo):
             if chan := abo.get_channel():
                 args[2] = Render.bold(commit.message.strip(), chan.get_server().get_connector().get_render_mode())
-                await chan.send(tiso(chan.get_lang_iso(), 'msg_git_update', args))
+                await chan.send(self.render_update(chan.get_lang_iso(), args))
             elif user := abo.get_user():
                 args[2] = Render.bold(commit.message.strip(), user.get_server().get_connector().get_render_mode())
                 await user.send('msg_git_update', args)
             else:
                 raise Exception("git abbo announce in not possible state.")
+
+    @staticmethod
+    def render_update(iso: str, args: list) -> str:
+        """Translate an update, with a readable fallback during cache reloads."""
+        text = tiso(iso, 'msg_git_update', args)
+        if not text.startswith('msg_git_update'):
+            return text
+        return (f'{args[0]} Update(s) for {args[1]} - {args[2]} by {args[3]}. '
+                f'{args[4]} file(s), +{args[5]}/-{args[6]} lines.')
 
     async def announce_pull_request(self, repo: GDO_GitRepo, pull: GDO_GitPullRequest):
         for abo in self.get_repo_abos(repo):
