@@ -12,6 +12,7 @@ from gdo.base.Util import Files, html
 from gdo.core.GDT_Name import GDT_Name
 from gdo.date.Time import Time
 from gdo.git.GDO_GitRepo import GDO_GitRepo
+from gdo.git.GDO_GitAbo import GDO_GitAbo
 from gdo.git.GDT_GitProvider import GDT_GitProvider
 from gdo.core.GDT_String import GDT_String
 
@@ -72,6 +73,7 @@ class git_add(Method):
                 'repo_commit': str(checkout.head.commit.hexsha),
                 'repo_commits': sum(1 for _ in checkout.iter_commits()),
             })
+            self.subscribe_current_target(repo)
             return self.reply('msg_cloned_repo', (repo.render_name(), html(url), path))
         except Exception as ex:
             Logger.exception(ex)
@@ -81,6 +83,19 @@ class git_add(Method):
                 Files.delete_dir(path)
             repo.delete()
             raise ex
+
+    def subscribe_current_target(self, repo: GDO_GitRepo) -> None:
+        """Subscribe the invoking user or channel exactly once after git.add."""
+        user = self._env_user
+        channel = self._env_channel
+        if GDO_GitAbo.table().get_repo_abo(repo, user, channel):
+            return
+        GDO_GitAbo.blank({
+            'gra_repo': repo.get_id(),
+            'gra_user': user.get_id() if not channel else None,
+            'gra_channel': channel.get_id() if channel else None,
+            'gra_creator': user.get_id(),
+        }).insert()
 
     @staticmethod
     def ensure_safe_directory(path: str) -> None:
