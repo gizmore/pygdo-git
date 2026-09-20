@@ -1,6 +1,7 @@
 import os
 import json
 import asyncio
+import subprocess
 from dataclasses import dataclass
 from urllib.error import URLError, HTTPError
 from urllib.request import Request, urlopen
@@ -227,15 +228,19 @@ class GDO_GitRepo(GDO):
     # Check #
     #########
     async def check_repo(self) -> GDT_RepoUpdate:
-        if not self.get_repo():
-            self.save_vals({
-                'repo_checked': Time.get_date(),
-            })
-            raise Exception(f"Invalid Repo! {self.render_name()}")
+        try:
+            if not self.get_repo():
+                raise Exception(f"Invalid Repo! {self.render_name()}")
 
-        Logger.debug(f"Checking repo {self.render_name()}")
-        old_hash = self.gdo_val('repo_commit')
-        scan = await asyncio.to_thread(self._pull_and_scan, self.get_path(), old_hash)
+            Logger.debug(f"Checking repo {self.render_name()}")
+            old_hash = self.gdo_val('repo_commit')
+            scan = await asyncio.to_thread(self._pull_and_scan, self.get_path(), old_hash)
+        except Exception:
+            # A broken or inaccessible checkout must not monopolize the
+            # single-repository polling turn. The next oldest repo can then
+            # be checked on the following timer tick.
+            self.save_val('repo_checked', Time.get_date())
+            raise
         self.save_vals({
             'repo_changed': Time.get_date() if scan.commit else self.gdo_val('repo_changed'),
             'repo_commit': scan.commit_hash,
@@ -250,6 +255,7 @@ class GDO_GitRepo(GDO):
     @staticmethod
     def _pull_and_scan(path: str, last_hash: str) -> 'GitRepoScan':
         """Perform blocking GitPython work outside the connector event loop."""
+        GDO_GitRepo.ensure_safe_directory(path)
         repo = git.Repo(path)
         repo.remotes.origin.pull()
         count = insertions = deletions = 0
@@ -268,3 +274,15 @@ class GDO_GitRepo(GDO):
                 latest = GitCommitInfo(commit.message, commit.author.name)
                 commit_hash = str(commit.hexsha)
         return GitRepoScan(latest, commit_hash, count, len(changed_files), insertions, deletions)
+
+    @staticmethod
+    def ensure_safe_directory(path: str) -> None:
+        """Trust one application-managed checkout for the Dog user only."""
+        path = os.path.abspath(path)
+        result = subprocess.run(
+            ['git', 'config', '--global', '--get-all', 'safe.directory'],
+            capture_output=True, check=True, text=True)
+        if path not in result.stdout.splitlines():
+            subprocess.run(
+                ['git', 'config', '--global', '--add', 'safe.directory', path],
+                check=True)

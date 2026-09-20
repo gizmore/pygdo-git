@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 import asgiref.sync
 import git
@@ -42,7 +41,7 @@ class git_add(Method):
         if GDO_GitRepo.table().get_by_vals({'repo_name': name}):
             raise ValueError('A repository with that shortname already exists.')
         path = Application.files_path(f"git_repo/{name}/")
-        self.ensure_safe_directory(path)
+        GDO_GitRepo.ensure_safe_directory(path)
         # A module reinstall can remove the database row while deliberately
         # preserving files.  Let the owner register that already-existing,
         # matching checkout again instead of requiring manual file removal.
@@ -96,18 +95,6 @@ class git_add(Method):
             'gra_channel': channel.get_id() if channel else None,
             'gra_creator': user.get_id(),
         }).insert()
-
-    @staticmethod
-    def ensure_safe_directory(path: str) -> None:
-        """Trust an application-managed checkout for the Dog's Git user."""
-        path = os.path.abspath(path)
-        result = subprocess.run(
-            ['git', 'config', '--global', '--get-all', 'safe.directory'],
-            capture_output=True, check=True, text=True)
-        if path not in result.stdout.splitlines():
-            subprocess.run(
-                ['git', 'config', '--global', '--add', 'safe.directory', path],
-                check=True)
 
     @staticmethod
     def is_git_url(url: str) -> bool:
