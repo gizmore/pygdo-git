@@ -230,7 +230,7 @@ class GDO_GitRepo(GDO):
     async def check_repo(self) -> GDT_RepoUpdate:
         try:
             if not self.get_repo():
-                raise Exception(f"Invalid Repo! {self.render_name()}")
+                await asyncio.to_thread(self.restore_missing_checkout, self.get_path(), self.get_url())
 
             Logger.debug(f"Checking repo {self.render_name()}")
             old_hash = self.gdo_val('repo_commit')
@@ -251,6 +251,21 @@ class GDO_GitRepo(GDO):
             return None
         return GDT_RepoUpdate().commit(scan.commit).added(scan.count).stats(
             scan.files, scan.insertions, scan.deletions)
+
+    @staticmethod
+    def restore_missing_checkout(path: str, url: str) -> None:
+        """Clone a missing checkout without replacing any existing path."""
+        from gdo.git.method.git_add import git_add
+        if not git_add.is_git_url(url):
+            raise ValueError('Cannot restore checkout: unsupported repository URL')
+        path = os.path.normpath(path)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
+            os.mkdir(path)
+        except FileExistsError as error:
+            raise ValueError(f'Cannot restore checkout: path already exists: {path}') from error
+        GDO_GitRepo.ensure_safe_directory(path)
+        git.Repo.clone_from(url, path)
 
     @staticmethod
     def _pull_and_scan(path: str, last_hash: str) -> 'GitRepoScan':
