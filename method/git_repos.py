@@ -8,6 +8,9 @@ from gdo.table.MethodQueryTable import MethodQueryTable
 
 class git_repos(MethodQueryTable):
 
+    def gdo_needs_authentication(self) -> bool:
+        return True
+
     def gdo_method_hidden(self) -> bool:
         return True
 
