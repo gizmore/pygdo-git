@@ -232,7 +232,6 @@ class GDO_GitRepo(GDO):
             if not self.get_repo():
                 await asyncio.to_thread(self.restore_missing_checkout, self.get_path(), self.get_url())
 
-            Logger.debug(f"Checking repo {self.render_name()}")
             old_hash = self.gdo_val('repo_commit')
             scan = await asyncio.to_thread(self._pull_and_scan, self.get_path(), old_hash)
         except Exception:
