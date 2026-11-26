@@ -1,3 +1,5 @@
+import os
+
 from gdo.base.Application import Application
 from gdo.base.GDO_Module import GDO_Module
 from gdo.base.GDT import GDT
@@ -40,9 +42,23 @@ class module_git(GDO_Module):
     def gdo_subscribe_events(self):
         Application.EVENTS.add_timer(self.cfg_sleep(), self.git_timer)
 
+    @staticmethod
+    def is_running_dog_process() -> bool:
+        """CLI/REPL can set IS_DOG too; require this process to own the Dog PID."""
+        if not Application.IS_DOG or Application.IS_HTTP or getattr(Application, 'IS_REPL', False):
+            return False
+        from gdo.core.method.launch import launch
+        try:
+            with open(launch.lock_path(), encoding='ascii') as lock:
+                return int(lock.read().strip()) == os.getpid()
+        except (OSError, ValueError):
+            return False
+
     async def git_timer(self):
         sleep = self.cfg_sleep()
         try:
+            if not self.is_running_dog_process():
+                return
             cut = Time.get_date(Application.TIME - sleep)
             if repo := GDO_GitRepo.table().select().where(f"repo_ready IS NOT NULL AND repo_checked < '{cut}'").order('repo_checked').first().exec().fetch_object():
                 if update := await repo.check_repo():
